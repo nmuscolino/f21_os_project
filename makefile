@@ -31,7 +31,9 @@ classes: $(CLASSES:.java=.class)
 CLASSES = \
 	$(JAVA_PKG)/ReportingSystem.java \
         $(JAVA_PKG)/MessageJNI.java \
-	$(JAVA_PKG)/DebugLog.java 
+	$(JAVA_PKG)/DebugLog.java \
+	$(JAVA_PKG)/ReportGenerator.java \
+	$(JAVA_PKG)/ReportField.java 
 
 classes: $(CLASSES:.java=.class)
 

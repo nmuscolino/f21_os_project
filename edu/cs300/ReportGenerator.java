@@ -1,4 +1,4 @@
-package edu.cs300
+package edu.cs300;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -18,6 +18,7 @@ public class ReportGenerator extends Thread {
 	Vector<ReportField> reportFields;
 
 	public ReportGenerator(String inputFileName, int id, int reportCount) {
+		//System.err.println("In the ReportGenerator constructor");
 		this.inputFileName = inputFileName;
 		this.index = id;
 		this.reportCount = reportCount;
@@ -34,18 +35,24 @@ public class ReportGenerator extends Thread {
 			this.outputFileName = scanner.nextLine();
 			
 			//Read each subsequent line and parse it to retrieve components of each report field
+			this.reportFields = new Vector<ReportField>(0);
 			String tempFieldString;
 			int tempBeginningCol;
 			int tempEndCol;
 			String tempColHeading;
+			//System.err.println("Getting fields for Thread " + this.index);
 			while(scanner.hasNext()) {
 				tempFieldString = scanner.nextLine();
+				//System.err.println(tempFieldString);
 				//Retrieve index of first column corresponding to the current field
-				tempBeginningCol = Integer.parseInt(tempFieldString.substring(0, (tempFieldString.indexOf('-') - 1)));
+				//System.err.println(tempFieldString.substring(0, (tempFieldString.indexOf('-'))));
+				//System.err.println(tempFieldString.indexOf('-'));
+				tempBeginningCol = Integer.parseInt(tempFieldString.substring(0, (tempFieldString.indexOf('-'))));
 				//Retrieve index of the last column corresponding to the current field
-				tempEndCol = Integer.parseInt(tempFieldString.substring((tempFieldString.indexOf('-') + 1), (tempFieldString.indexOf(',') - 1)));
+				tempEndCol = Integer.parseInt(tempFieldString.substring((tempFieldString.indexOf('-') + 1), (tempFieldString.indexOf(','))));
 				//Retrieve the name of the heading corresponding to the current field
 				tempColHeading = tempFieldString.substring((tempFieldString.indexOf(',') + 1));
+				//System.err.println((tempBeginningCol - 1) + "\n" + (tempEndCol - 1) +"\n" + tempColHeading);
 				reportFields.add(new ReportField(tempBeginningCol - 1, tempEndCol - 1, tempColHeading));
 			}
 		scanner.close();
@@ -71,14 +78,15 @@ public class ReportGenerator extends Thread {
 	public String parseMessage(String message) {
 		String parsedMessage = "";
 		for (int i = 0; i < this.reportFields.size(); i++) {
-			parsedMessage = parsedMessage + message.substring(reportFields.elementAt(i).beginningCol, reportFields.elementAt(i).endCol) + "\t";
+			parsedMessage = parsedMessage + message.substring(reportFields.elementAt(i).startIndex, (reportFields.elementAt(i).endIndex + 1)) + "\t";
 		}
 		parsedMessage = parsedMessage + "\n";
 		return parsedMessage;
 	}
 
 	public void run() {
-		MessageJNI.writeRecordRequest(this.index, this.reportCount, this.searchString);
+		//System.err.println("In run method of ReportGenerator " + this.index);
+		MessageJNI.writeReportRequest(this.index, this.reportCount, this.searchString);
 
 		createOutputFile(this.outputFileName);
 		try {
@@ -87,14 +95,14 @@ public class ReportGenerator extends Thread {
 			//Write report title and field headers to output file
 			writer.write(this.reportTitle + "\n");
 			for(int i = 0; i < this.reportFields.size(); i++) {
-				writer.write(this.reportFields.elementAt(i) + "\t");
+				writer.write(this.reportFields.elementAt(i).title + "\t");
 			}
 			writer.write("\n");		
 
 			//Read received reports and write necessary fields to the output file
 			String receivedMessage;
 			do {
-				receivedMessage = MessageJNI.readReportRequest(this.index);
+				receivedMessage = MessageJNI.readReportRecord(this.index);
 				if (receivedMessage.length() == 0) {
 					writer.write("\n");
 				} else {

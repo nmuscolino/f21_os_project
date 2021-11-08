@@ -21,12 +21,19 @@ public class ReportingSystem {
 
 			   Scanner reportList = new Scanner(file);
 			   reportCounter = reportList.nextInt();
+			   //System.err.println(reportCounter);
 			   reportList.nextLine();
 			   String[] reports = new String[reportCounter];
-			   
+			   String tmp;			   
+   
 			   int i = 0;
 			   while(reportList.hasNextLine()) {
-				reports[i] = reportList.nextLine();
+				tmp = reportList.nextLine();
+				//System.err.println(tmp);
+				//System.err.println("i = " + i);
+				if (tmp.isEmpty()) break;
+				else reports[i] = tmp;
+				//System.err.println(reports[i]);
 				i++;
 			   } 
 
@@ -34,9 +41,11 @@ public class ReportingSystem {
 				 DebugLog.log("Load specs and create threads for each report\nStart thread to request, process and print reports");
 
 			   Vector<ReportGenerator> reportVector = new Vector<ReportGenerator>(reportCounter);
-			   for (int i = 0; i < reportCounter; i++) {
-				reportVector.add(new ReportGenerator(reports[i], i + 1, reportCounter);
-				reportVector.elementAt(i).start(); 
+			   for (int j = 0; j < reportCounter; j++) {
+				//System.err.println("Constructing ReportGenerator " + j);
+				reportVector.add(new ReportGenerator(reports[j], j + 1, reportCounter));
+				//System.err.println("Starting ReportGenerator " + j);
+				reportVector.elementAt(j).start(); 
 			   }
 
 			   reportList.close();

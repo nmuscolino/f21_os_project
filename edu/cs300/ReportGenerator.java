@@ -8,6 +8,11 @@ import java.util.Enumeration;
 import java.util.Scanner;
 import java.util.Vector;
 
+/*ReportGenerator is used to create threads that will request records from
+ *process_records.c. If matching records are found, it will receive them from
+ *process_records.c and parse them for the desired fields. It then outputs the
+ *records in a specified report file.
+ */ 
 public class ReportGenerator extends Thread {
 	String inputFileName;
 	int index;
@@ -17,12 +22,14 @@ public class ReportGenerator extends Thread {
 	String outputFileName;
 	Vector<ReportField> reportFields;
 
+	//Constructor
 	public ReportGenerator(String inputFileName, int id, int reportCount) {
-		//System.err.println("In the ReportGenerator constructor");
+
 		this.inputFileName = inputFileName;
 		this.index = id;
 		this.reportCount = reportCount;
-		
+
+		//Read the report specifications from the provided input file		
 		File inputFile = new File(inputFileName);
 		Scanner scanner;
 		try {
@@ -40,27 +47,28 @@ public class ReportGenerator extends Thread {
 			int tempBeginningCol;
 			int tempEndCol;
 			String tempColHeading;
-			//System.err.println("Getting fields for Thread " + this.index);
+			
+			//Read the remaining lines of the input file to obtain the desired field ranges and headers
 			while(scanner.hasNext()) {
 				tempFieldString = scanner.nextLine();
-				//System.err.println(tempFieldString);
 				//Retrieve index of first column corresponding to the current field
-				//System.err.println(tempFieldString.substring(0, (tempFieldString.indexOf('-'))));
-				//System.err.println(tempFieldString.indexOf('-'));
 				tempBeginningCol = Integer.parseInt(tempFieldString.substring(0, (tempFieldString.indexOf('-'))));
 				//Retrieve index of the last column corresponding to the current field
 				tempEndCol = Integer.parseInt(tempFieldString.substring((tempFieldString.indexOf('-') + 1), (tempFieldString.indexOf(','))));
 				//Retrieve the name of the heading corresponding to the current field
 				tempColHeading = tempFieldString.substring((tempFieldString.indexOf(',') + 1));
-				//System.err.println((tempBeginningCol - 1) + "\n" + (tempEndCol - 1) +"\n" + tempColHeading);
+				
+				//Add the field to the reportFields vector for output to the report file
 				reportFields.add(new ReportField(tempBeginningCol - 1, tempEndCol - 1, tempColHeading));
 			}
-		scanner.close();
+
+			scanner.close();
 		} catch (FileNotFoundException e) {
 			System.err.println("Error reading from input file.");
 		}
 	}
 
+	//Creates the file to which the report will be written
 	public void createOutputFile(String fileName) {
 		try {
 			File outputFile = new File(fileName);
@@ -77,6 +85,9 @@ public class ReportGenerator extends Thread {
 	//Parses received message for necessary fields and builds the string to be written to the output report
 	public String parseMessage(String message) {
 		String parsedMessage = "";
+	
+		//For each field in the output report, concatenate the desired text to be output as a single string
+		//This will include any trailing spaces in a selected field
 		for (int i = 0; i < this.reportFields.size(); i++) {
 			parsedMessage = parsedMessage + message.substring(reportFields.elementAt(i).startIndex, (reportFields.elementAt(i).endIndex + 1)) + "\t";
 		}
@@ -84,10 +95,13 @@ public class ReportGenerator extends Thread {
 		return parsedMessage;
 	}
 
+	//The code to be executed by each running thread
 	public void run() {
-		//System.err.println("In run method of ReportGenerator " + this.index);
+		
+		//Send a report request to process_records.c
 		MessageJNI.writeReportRequest(this.index, this.reportCount, this.searchString);
 
+		//Create the output file for the report
 		createOutputFile(this.outputFileName);
 		try {
 			FileWriter writer = new FileWriter(this.outputFileName);
@@ -100,9 +114,12 @@ public class ReportGenerator extends Thread {
 			writer.write("\n");		
 
 			//Read received reports and write necessary fields to the output file
+			//Receive at least one message from process_records.c to indicate end of report
 			String receivedMessage;
 			do {
 				receivedMessage = MessageJNI.readReportRecord(this.index);
+			
+				//Check for zero-length record to indicate end of report	
 				if (receivedMessage.length() == 0) {
 					writer.write("\n");
 				} else {
@@ -111,6 +128,7 @@ public class ReportGenerator extends Thread {
 				}
 			} while (receivedMessage.length() > 0);
 
+			//Report is complete. Flush and close writer
 			writer.flush();
 			writer.close();
 		} catch (IOException e) {

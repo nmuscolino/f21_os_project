@@ -55,10 +55,11 @@ int recordsRead = 0;
 int printStatusFlag = 0;
 status_t* statusArray;
 
+//Initialize mutex and condition variable
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condStatus = PTHREAD_COND_INITIALIZER;
 
-//Prints status report to stdout on Ctrl+C
+//Signals statusThread to print status report on Ctrl+C
 void sigintHandler(int sig_num) {
      printStatusFlag = 1;
      pthread_cond_signal(&condStatus); 
@@ -66,18 +67,20 @@ void sigintHandler(int sig_num) {
      
 //Send report record back to ReportGenerator
 void sendRecord(char* record, int index) {
+    
      int msqid;
      int msgflg = IPC_CREAT | 0666;
      key_t key;
      report_record_buf sbuf;
      size_t buf_length;
 
+     //Check to ensure file in home directory has been created for message queues
      key = ftok(FILE_IN_HOME_DIR, index);
      if (key == 0xffffffff) {
 	 fprintf(stderr, "Key cannot be 0xffffffff..fix queue_ids.h to link to existing file\n");
-	 //return 1;
      }
 
+     //Retrieve id of message queue for sending records
      if ((msqid = msgget(key, msgflg)) < 0) {
 	 int errnum = errno;
 	 fprintf(stderr, "Value of errno: %d\n", errno);
@@ -89,7 +92,7 @@ void sendRecord(char* record, int index) {
 
      // We'll send message type 2
      sbuf.mtype = 2;
-     strlcpy(sbuf.record, record, RECORD_FIELD_LENGTH); //FIXME: Double check parameters here
+     strlcpy(sbuf.record, record, RECORD_FIELD_LENGTH);
      buf_length = strlen(sbuf.record) + sizeof(int)+1;//struct size without
      // Send a message
      if((msgsnd(msqid, &sbuf, buf_length, IPC_NOWAIT)) < 0) {
@@ -105,7 +108,7 @@ void sendRecord(char* record, int index) {
 
 //Receive report request from ReportGenerator
 report_request_buf receiveRequest(int msqid) {
-     //int msqid;
+
      int msgflg = IPC_CREAT | 0666;
      key_t key;
      report_request_buf rbuf;
@@ -114,17 +117,7 @@ report_request_buf receiveRequest(int msqid) {
      key = ftok(FILE_IN_HOME_DIR, QUEUE_NUMBER);
      if (key == 0xffffffff) {
 	 fprintf(stderr, "Key cannot be 0xffffffff..fix queue_ids.h to link to existing file\n");
-	 //return 1;
      }
-
-     //if((msqid = msgget(key, msgflg)) < 0) {
-	// int errnum = errno;
-	// fprintf(stderr, "Value of errno: %d\n", errno);
-	// perror("(msgget)");
-	// fprintf(stderr, "Error msgget: %s\n", strerror( errnum ));
-     //}
-     //else
-	// fprintf(stderr, "msgget: msgget succeeded: msgqid = %d\n", msqid);
 
      // msgrcv to receive message
      int ret;
@@ -140,23 +133,33 @@ report_request_buf receiveRequest(int msqid) {
      } while ((ret < 0 ) && (errno == 4));
      //fprintf(stderr, "msgrcv error return code --%d:$d--",ret,errno);
 
+     fprintf(stderr,"process-msgrcv-request: msg type-%ld, Record %d of %d: %s ret/bytes rcv'd=%d\n", rbuf.mtype, rbuf.report_idx,rbuf.report_count,rbuf.search_string, ret);
+     
      return rbuf;
 }
 
 //Status thread function. Prints status report upon Ctrl+C and end of program
 void *printStatus(void *statusArray) {
      status_t* statuses = (status_t *) statusArray;
+     
+     //Outer while loop to ensure signal can be received multiple times
      while(1) {
 	 pthread_mutex_lock(&mutex);
+	 //Wait until Ctrl+C or end of program before printing status report
 	 while(printStatusFlag == 0) pthread_cond_wait(&condStatus, &mutex);
+
+	 //Print status report
 	 printf("***Report***\n");
 	 printf("%d records read for %d reports\n", recordsRead, requestCount);
 	 for (int i = 0; i < requestCount; i++) {
 	     printf("Records sent for report index %d: %d\n", statuses[i].reportIndex, statuses[i].recordsSent);
 	 }
+
 	 //Flag is set to 2 to signify end of program
 	 //If triggered by Ctrl+C, flag will be 1
 	 if (printStatusFlag == 2) break;
+
+	 //Reset flag to 0 if not end of program to tell statusThread to wait
 	 printStatusFlag = 0;
 	 pthread_mutex_unlock(&mutex);
      }
@@ -167,14 +170,18 @@ int main() {
      //Declare singal handler
      signal(SIGINT, sigintHandler);
 
+     //Declare thread to print status report
      pthread_t statusThread;
 
+     //Declare buffer to store report requests
      report_request_buf request;
 
+     //Declare variables necessary to create message queue for receiving requests
      int msqid;
      int msgflg = IPC_CREAT | 0666;
      key_t key;
 
+     //Check to ensure file in home directory has been created for message queues
      key = ftok(FILE_IN_HOME_DIR, QUEUE_NUMBER);
      if (key == 0xffffffff) {
 	 fprintf(stderr, "Key cannot be 0xffffffff..fix queue_ids.h to link to existing file\n");
@@ -197,8 +204,8 @@ int main() {
      request = receiveRequest(msqid);
      requestCount = request.report_count;
      report_request_buf requestArray[requestCount];
+
      //Report indexes start with 1, so must subtract 1 for 0 indexed array
-     //Reports will be sorted by index in the array
      requestArray[request.report_idx - 1] = request;
 
      //Now that the number of requests is known, the status array can be initialized
@@ -211,11 +218,11 @@ int main() {
 
      //Receive all remaining requests and store in the array
      //Start with i = 1 to account for previously received request
-     fprintf(stderr, "Receiving remaining requests\n");
      for(int i = 1; i < requestCount; i++) {
 	 request = receiveRequest(msqid);
 	 requestArray[request.report_idx - 1] = request;
 	 
+	 //Update the status array with the values corresponding to each request
 	 pthread_mutex_lock(&mutex);
 	 statusArray[i].reportIndex = request.report_idx;
 	 statusArray[i].recordsSent = 0;
@@ -226,13 +233,12 @@ int main() {
      pthread_create(&statusThread, NULL, printStatus, statusArray);
 
      //Read records from stdin and compare to search strings of each request
-     fprintf(stderr, "Reading records from stdin\n");
      char* record = (char*)malloc(sizeof(char) * RECORD_MAX_LENGTH);
      while(fgets(record, RECORD_MAX_LENGTH, stdin) != NULL) {
 	 for(int i = 0; i < requestCount; i++) {
+	      
 	      //If search string is contained in the report, send the report back
 	      //to ReportGenerator
-	      //fprintf(stderr, "%s\n", record);
 	      if(strstr(record, requestArray[i].search_string) != NULL) {
 		   sendRecord(record, requestArray[i].report_idx);
 		   pthread_mutex_lock(&mutex);
@@ -240,25 +246,33 @@ int main() {
 		   pthread_mutex_unlock(&mutex);
 	      }
 	 }
+	
+	 //Update the number of records read from stdin
+	 //Do not update if the last line read is blank
 	 pthread_mutex_lock(&mutex);
 	 if (strcmp(record, "\n") != 0) recordsRead++;
-	 //fprintf(stderr, "recordsRead is %d\n", recordsRead);
 	 pthread_mutex_unlock(&mutex);
 	
+	 //Sleep for five seconds after ten records have been read
 	 if (recordsRead == 10) sleep(5);
      }
-     fprintf(stderr, "Finished reading records\n");
-     //All records have been processed, send a record of length 0 to ReportGenerator
+     
+     //All records have been processed, send a record of length 0
+     //to each thread of ReportGenerator
      record[0] = 0;
      for (int i = 0; i <  requestCount; i++) {
          sendRecord(record, requestArray[i].report_idx);
      }
+
+     //Free memory allocated for record
      free(record);
 
      //End of program. Print status report and join statusThread
+     //Set printStatusFlag to 2 to signify end of program
      printStatusFlag = 2;
      pthread_cond_signal(&condStatus);
      pthread_join(statusThread, NULL);
+
      return 0;
 }
 

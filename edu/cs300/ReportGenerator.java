@@ -85,12 +85,20 @@ public class ReportGenerator extends Thread {
 	//Parses received message for necessary fields and builds the string to be written to the output report
 	public String parseMessage(String message) {
 		String parsedMessage = "";
-	
+
 		//For each field in the output report, concatenate the desired text to be output as a single string
 		//This will include any trailing spaces in a selected field
 		for (int i = 0; i < this.reportFields.size(); i++) {
+			if(message.length() < (reportFields.elementAt(i).endIndex + 1)) {
+				//System.err.println("message too short");
+				message = String.format("%-" + String.valueOf(reportFields.elementAt(i).endIndex + 1) + "s", message);
+				message = message.replace("\n", " ").replace("\r", " ");
+				//System.err.println("message now has length " + message.length()); 
+			}
 			parsedMessage = parsedMessage + message.substring(reportFields.elementAt(i).startIndex, (reportFields.elementAt(i).endIndex + 1)) + "\t";
+			parsedMessage = parsedMessage.replace("\n", " ").replace("\r", " ");
 		}
+
 		parsedMessage = parsedMessage + "\n";
 		return parsedMessage;
 	}
@@ -122,7 +130,6 @@ public class ReportGenerator extends Thread {
 				//Check for zero-length record to indicate end of report	
 				if (receivedMessage.length() == 0) {
 					break;
-					//writer.write("\n");
 				} else {
 					receivedMessage = parseMessage(receivedMessage);
 					writer.write(receivedMessage);

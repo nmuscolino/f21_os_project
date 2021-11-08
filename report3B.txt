@@ -1,0 +1,8 @@
+ProductX Report
+ProductX
+productx.rpt
+1-12,Project Name
+17-22,Number
+25-40,Project Location
+49-58, Department
+

@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "report_record_formats.h"
 #include "queue_ids.h"
 
@@ -255,9 +256,8 @@ int main() {
 	 //Update the number of records read from stdin
 	 //Do not update if the last line read is blank
 	 pthread_mutex_lock(&mutex);
-	 if (strcmp(record, "\n") != 0) recordsRead++;
+	 if ((strcmp(record, "\n") != 0) && (strcmp(record, " ") != 0) && (strcmp(record, "\r") != 0))  recordsRead++;
 	 pthread_mutex_unlock(&mutex);
-	
 	 //Sleep for five seconds after ten records have been read
 	 if (recordsRead == 10) sleep(5);
      }

@@ -5,11 +5,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include "report_record_formats.h"
-#include "queue_ids.h"
 #include <signal.h>
 #include <pthread.h>
 #include <unistd.h>
+#include "report_record_formats.h"
+#include "queue_ids.h"
 
 #ifndef darwin
 size_t                  /* O - Length of string */
@@ -206,14 +206,19 @@ int main() {
      report_request_buf requestArray[requestCount];
 
      //Report indexes start with 1, so must subtract 1 for 0 indexed array
+     //Report requests will be sorted numerically in the array
      requestArray[request.report_idx - 1] = request;
 
      //Now that the number of requests is known, the status array can be initialized
      //Set the values of the status array corresponding to this report accordingly
      statusArray = (status_t*) malloc(sizeof(status_t) * requestCount);
      pthread_mutex_lock(&mutex);
-     statusArray[0].reportIndex = request.report_idx;
-     statusArray[0].recordsSent = 0;
+    
+     //statusArray is indexed with (request.report_idx - 1) to ensure that reports
+     //are sorted numerically in the status array
+     //This ensures that record statuses are always printed in number order
+     statusArray[request.report_idx - 1].reportIndex = request.report_idx;
+     statusArray[request.report_idx - 1].recordsSent = 0;
      pthread_mutex_unlock(&mutex);
 
      //Receive all remaining requests and store in the array
@@ -224,8 +229,8 @@ int main() {
 	 
 	 //Update the status array with the values corresponding to each request
 	 pthread_mutex_lock(&mutex);
-	 statusArray[i].reportIndex = request.report_idx;
-	 statusArray[i].recordsSent = 0;
+	 statusArray[request.report_idx - 1].reportIndex = request.report_idx;
+	 statusArray[request.report_idx - 1].recordsSent = 0;
 	 pthread_mutex_unlock(&mutex);
      }
 
@@ -242,7 +247,7 @@ int main() {
 	      if(strstr(record, requestArray[i].search_string) != NULL) {
 		   sendRecord(record, requestArray[i].report_idx);
 		   pthread_mutex_lock(&mutex);
-		   statusArray[i].recordsSent++;
+		   statusArray[requestArray[i].report_idx - 1].recordsSent++;
 		   pthread_mutex_unlock(&mutex);
 	      }
 	 }

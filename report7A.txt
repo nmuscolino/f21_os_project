@@ -1,0 +1,7 @@
+Employee: Phil Coulson
+Coulson
+p_coulson.rpt
+1-9,Last Name
+17-38,Social Security Number
+65-74,Department
+

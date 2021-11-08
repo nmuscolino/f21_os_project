@@ -1,0 +1,7 @@
+Salary: $25000
+25000
+salary_25000.rpt
+1-9,Last Name
+17-38,Social Security Number
+65-74,Department
+

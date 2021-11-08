@@ -1,0 +1,7 @@
+Research Department Employees
+Research
+research_employees.rpt
+1-9,Last Name
+17-38,Social Security Number
+41-46,Salary
+

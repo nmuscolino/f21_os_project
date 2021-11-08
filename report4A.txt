@@ -1,0 +1,9 @@
+Employee: Robert Banner
+Banner
+r_banner.rpt
+1-9,Last Name
+17-38,Social Security Number
+41-46,Salary
+49-58,Supervisor
+65-74,Department
+

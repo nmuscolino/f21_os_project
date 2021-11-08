@@ -121,7 +121,8 @@ public class ReportGenerator extends Thread {
 			
 				//Check for zero-length record to indicate end of report	
 				if (receivedMessage.length() == 0) {
-					writer.write("\n");
+					break;
+					//writer.write("\n");
 				} else {
 					receivedMessage = parseMessage(receivedMessage);
 					writer.write(receivedMessage);
